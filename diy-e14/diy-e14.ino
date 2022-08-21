@@ -30,7 +30,7 @@
 
 //#define ENABLE_OLED //if want use oled ,turn on thi macro
 //#define SOFTAP_MODE // If you want to run our own softap turn this on
-#define ENABLE_WEBSERVER
+//#define ENABLE_WEBSERVER
 #define ENABLE_RTSPSERVER
 
 #ifdef ENABLE_OLED
@@ -133,6 +133,30 @@ void lcdMessage(String msg)
   #endif
 }
 
+#ifndef SOFTAP_MODE
+// Define Eventhandlers for Wifievents when in client mode
+void Wifi_connected(WiFiEvent_t event, WiFiEventInfo_t info)
+{
+    Serial.println("Successfully connected to Access Point");
+}
+  
+void Get_IPAddress(WiFiEvent_t event, WiFiEventInfo_t info)
+{
+    Serial.println("WIFI is connected!");
+    Serial.println("IP address: ");
+    Serial.println(WiFi.localIP());
+}
+  
+void Wifi_disconnected(WiFiEvent_t event, WiFiEventInfo_t info)
+{
+    Serial.println("Disconnected from WIFI access point");
+    Serial.print("WiFi lost connection. Reason: ");
+    Serial.println(info.disconnected.reason);
+    Serial.println("Reconnecting to ...");
+    WiFi.begin(ssid, password);    
+}
+#endif
+
 void setup()
 {
   #ifdef ENABLE_OLED
@@ -210,16 +234,27 @@ void setup()
         Serial.println(":8554/mjpeg/1");
     }
 #else
+    // Client-mode   
     lcdMessage(String("join ") + ssid);
+    
     WiFi.mode(WIFI_STA);
+    WiFi.disconnect(true);
+    delay(1000);
+    
+    // Register Eventhandlers for Wifi-Events
+    WiFi.onEvent(Wifi_connected,SYSTEM_EVENT_STA_CONNECTED);
+    WiFi.onEvent(Get_IPAddress, SYSTEM_EVENT_STA_GOT_IP);
+    WiFi.onEvent(Wifi_disconnected, SYSTEM_EVENT_STA_DISCONNECTED); 
+
+    //connect
     WiFi.begin(ssid, password);
     while (WiFi.status() != WL_CONNECTED)
     {
         delay(500);
         Serial.print(F("."));
     }
-    ip = WiFi.localIP();
-    Serial.println(F("WiFi connected"));
+    //ip = WiFi.localIP();
+    //Serial.println(F("WiFi connected"));
     Serial.println("");
     Serial.println(ip);
     Serial.print("Stream Link: rtsp://");
@@ -246,7 +281,7 @@ CRtspSession *session;
 WiFiClient client; // FIXME, support multiple clients
 
 void loop()
-{
+{  
 #ifdef ENABLE_WEBSERVER
     server.handleClient();
 #endif
